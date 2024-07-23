@@ -133,6 +133,6 @@ genes_uniquely_DE.markers.sortedByPval =
 top_marker_each = genes_uniquely_DE.markers.sortedByPval %>% dplyr::group_by("cca_clusters") %>% do(head(., n=100))
 #write an exel file of top markers sorted
 library(writexl)
-write_xlsx(top_marker_each,"/home/top_marker_each_aging73_88_alz_integrated.xlsx")
+write_xlsx(top_marker_each,"/home/top_marker_each_cluster_allsamples.xlsx")
 ###
 saveRDS(all_samples.combined , file = "all_samples.rds")
