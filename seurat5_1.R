@@ -87,10 +87,52 @@ seurat_list <- lapply(resolutions, function(resolution) {
   return(seurat)
 })
 ## do clustering
-combined <- FindClusters(all_samples.combined, resolution = 0.1, cluster.name = "unintegrated_clusters")
+all_samples.combined <- FindClusters(all_samples.combined, resolution = 0.1, cluster.name = "unintegrated_clusters")
 
 ## runiing UMAP
-combined <- RunUMAP(all_samples.combined, dims = 1:100, reduction = "pca", reduction.name = "umap.unintegrated")
+all_samples.combined <- RunUMAP(all_samples.combined, dims = 1:100, reduction = "pca", reduction.name = "umap.unintegrated")
 pdf("UMAP_ALL_res01.pdf")
 DimPlot(all_samples.combined, reduction = "umap.unintegrated"و label=T)
 dev.off()
+
+#differential expression genes analysis for each cluster
+
+#Using differentially expressed genes to help identify cell subsets
+MIN_LOGFOLD_CHANGE = 0.25 # set to minimum required average log fold change in gene expression.
+MIN_PCT_CELLS_EXPR_GENE = 0.1  # minimum percent of cells that must express gene in either clstr
+all.markers = FindAllMarkers(all_samples.combined,
+                             min.pct = MIN_PCT_CELLS_EXPR_GENE,
+                             logfc.threshold = MIN_LOGFOLD_CHANGE,
+                             slot = "data",
+                             test.use = "wilcox",
+                             return.thresh=0.05,
+                             verbose = T,
+                             only.pos = TRUE)
+# sort all the markers by p-value
+all.markers.sortedByPval = all.markers[order(all.markers$p_val),]
+
+# take a look at the top most significant markers
+head(all.markers.sortedByPval)
+#a heatmap showing the top 10 marker genes for each cluster
+pdf("topmarkerhitmap_allsamples.pdf")
+top10 <- all.markers.sortedByPval %>%  group_by(cluster)  %>% do(head(., n=10))
+DoHeatmap(object = all_samples.combined, features = top10$gene)+ NoLegend() +
+    theme(axis.text.y = element_text(color = "black", size = 5))
+dev.off()
+
+#write an exel file of top 100 markers
+library(writexl)
+top100 <- all.markers.sortedByPval %>%  group_by("cca_clusters")  %>% do(head(., n=100))
+write_xlsx(top100,"/home/top100marker_allsamples.xlsx")
+#Get genes uniquely differentially expressed in each cluster
+genes_uniquely_DE = all.markers.sortedByPval %>% dplyr::filter(avg_log2FC >= MIN_LOGFOLD_CHANGE) %>% group_by(gene) %>%  summarize(n=n()) %>%  dplyr::filter(n==1)
+# Sort DE genes by p value.
+genes_uniquely_DE.markers.sortedByPval =
+  all.markers.sortedByPval[all.markers.sortedByPval$gene %in% genes_uniquely_DE$gene &
+                             all.markers.sortedByPval$avg_log2FC >= MIN_LOGFOLD_CHANGE,]
+top_marker_each = genes_uniquely_DE.markers.sortedByPval %>% dplyr::group_by("cca_clusters") %>% do(head(., n=100))
+#write an exel file of top markers sorted
+library(writexl)
+write_xlsx(top_marker_each,"/home/top_marker_each_aging73_88_alz_integrated.xlsx")
+###
+saveRDS(all_samples.combined , file = "all_samples.rds")
